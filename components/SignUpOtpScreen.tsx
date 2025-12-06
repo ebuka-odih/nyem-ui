@@ -1,20 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from './Button';
 import { ArrowLeft } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
 
 interface SignUpOtpScreenProps {
   phoneNumber: string;
-  onVerify: (isNewUser: boolean) => void;
+  onVerify: () => void;
   onBack: () => void;
 }
 
 export const SignUpOtpScreen: React.FC<SignUpOtpScreenProps> = ({ phoneNumber, onVerify, onBack }) => {
   const [otp, setOtp] = useState<string[]>(new Array(6).fill(""));
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const { verifyOtp } = useAuth();
 
   const handleChange = (element: HTMLInputElement, index: number) => {
     if (isNaN(Number(element.value))) return false;
@@ -35,32 +31,10 @@ export const SignUpOtpScreen: React.FC<SignUpOtpScreenProps> = ({ phoneNumber, o
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-
-    const otpCode = otp.join("");
-    if (otpCode.length !== 6) {
-      setError('Please enter the complete 6-digit code');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const fullPhone = `+234${phoneNumber}`;
-      const result = await verifyOtp({
-        phone: fullPhone,
-        code: otpCode,
-      });
-      onVerify(result.new_user);
-    } catch (err: any) {
-      setError(err.message || 'Invalid OTP code. Please try again.');
-      console.error('Verify OTP error:', err);
-      // Clear OTP on error
-      setOtp(new Array(6).fill(""));
-      inputRefs.current[0]?.focus();
-    } finally {
-      setLoading(false);
+    if (otp.join("").length === 6) {
+        onVerify();
     }
   };
 
@@ -69,7 +43,7 @@ export const SignUpOtpScreen: React.FC<SignUpOtpScreenProps> = ({ phoneNumber, o
   }, []);
 
   return (
-    <div className="flex flex-col min-h-full bg-brand relative header-safe-top-brand">
+    <div className="flex flex-col min-h-full bg-brand relative">
         {/* Top Section: Header */}
         <div className="px-6 pt-8 pb-8 md:pt-10 md:pb-8 shrink-0">
             <button 
@@ -94,13 +68,6 @@ export const SignUpOtpScreen: React.FC<SignUpOtpScreenProps> = ({ phoneNumber, o
                     We sent a code to <span className="text-gray-700 font-semibold">+234{phoneNumber}</span>
                 </p>
 
-                {/* Error Message */}
-                {error && (
-                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-4">
-                        {error}
-                    </div>
-                )}
-
                 {/* OTP Inputs - Flex container ensures they fit on small screens */}
                 <div className="flex justify-between gap-1 md:gap-2 mb-10 px-1">
                     {otp.map((data, index) => (
@@ -120,13 +87,8 @@ export const SignUpOtpScreen: React.FC<SignUpOtpScreenProps> = ({ phoneNumber, o
                 
                 {/* Submit Button */}
                 <div>
-                     <Button 
-                        fullWidth 
-                        type="submit" 
-                        className="shadow-xl py-4 font-extrabold text-lg tracking-wide rounded-full"
-                        disabled={loading}
-                     >
-                        {loading ? 'Verifying...' : 'Verify'}
+                     <Button fullWidth type="submit" className="shadow-xl py-4 font-extrabold text-lg tracking-wide rounded-full">
+                        Verify
                     </Button>
                 </div>
 
