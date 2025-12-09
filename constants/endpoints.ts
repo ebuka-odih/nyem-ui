@@ -5,14 +5,20 @@
 export const ENDPOINTS = {
   auth: {
     sendOtp: '/auth/send-otp',
+    sendEmailOtp: '/auth/send-email-otp',
     verifyOtp: '/auth/verify-otp',
+    verifyPhoneForSeller: '/auth/verify-phone-for-seller',
     login: '/auth/login',
     register: '/auth/register',
+    google: '/auth/google',
+    forgotPassword: '/auth/forgot-password',
+    resetPassword: '/auth/reset-password',
   },
   profile: {
     me: '/profile/me',
     update: '/profile/update',
     updatePassword: '/profile/update-password',
+    checkUsername: '/profile/check-username',
   },
   items: {
     feed: '/items/feed',
@@ -23,6 +29,8 @@ export const ENDPOINTS = {
   },
   categories: '/categories',
   locations: '/locations',
+  locationsCities: '/locations/cities',
+  locationsAreas: (cityId?: string | number) => cityId ? `/locations/cities/${cityId}/areas` : '/locations/areas',
   swipes: {
     create: '/swipes',
     pendingRequests: '/swipes/pending-requests',
@@ -37,6 +45,7 @@ export const ENDPOINTS = {
   },
   conversations: {
     list: '/conversations',
+    start: '/conversations/start',
     messages: (id: string | number) => `/conversations/${id}/messages`,
     matches: (id: string | number) => `/conversations/${id}/matches`,
   },
@@ -51,4 +60,7 @@ export const ENDPOINTS = {
     status: '/location/status',
   },
 };
+
+
+
 

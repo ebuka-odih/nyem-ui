@@ -7,11 +7,12 @@ interface SignInScreenProps {
   onSignIn: () => void;
   onBack: () => void;
   onSignUp: () => void;
+  onForgotPassword?: () => void;
 }
 
-export const SignInScreen: React.FC<SignInScreenProps> = ({ onSignIn, onBack, onSignUp }) => {
+export const SignInScreen: React.FC<SignInScreenProps> = ({ onSignIn, onBack, onSignUp, onForgotPassword }) => {
   const [showPassword, setShowPassword] = useState(false);
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,13 +24,21 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ onSignIn, onBack, on
     setLoading(true);
 
     try {
-      if (!username.trim() || !password.trim()) {
-        setError('Please enter both username and password');
+      if (!email.trim() || !password.trim()) {
+        setError('Please enter both email and password');
         setLoading(false);
         return;
       }
 
-      await login(username.trim(), password);
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        setError('Please enter a valid email address');
+        setLoading(false);
+        return;
+      }
+
+      await login(email.trim(), password);
       onSignIn();
     } catch (err: any) {
       setError(err.message || 'Login failed. Please try again.');
@@ -61,14 +70,14 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ onSignIn, onBack, on
         <div className="flex-1 bg-white w-full rounded-t-[36px] px-6 md:px-8 pt-10 md:pt-12 pb-6 flex flex-col shadow-[0_-10px_40px_rgba(0,0,0,0.2)] animate-in slide-in-from-bottom duration-500">
             
             <form onSubmit={handleSubmit} className="space-y-6 md:space-y-8 flex-1 flex flex-col">
-                {/* Username Input */}
+                {/* Email Input */}
                 <div className="flex flex-col space-y-2">
-                    <label className="text-brand font-bold text-sm">Username or Phone</label>
+                    <label className="text-brand font-bold text-sm">Email</label>
                     <input 
-                        type="text" 
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        placeholder="Joydeo@gmail.com" 
+                        type="email" 
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="your.email@example.com" 
                         className="border-b border-gray-200 pb-2 text-gray-600 placeholder-gray-400 focus:outline-none focus:border-brand font-medium text-lg w-full bg-transparent transition-colors rounded-none"
                     />
                 </div>
@@ -103,7 +112,13 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ onSignIn, onBack, on
 
                 {/* Forgot Password */}
                 <div className="w-full text-right">
-                    <button type="button" className="text-gray-500 font-bold text-sm hover:text-brand transition-colors">Forgot password?</button>
+                    <button 
+                        type="button" 
+                        onClick={onForgotPassword}
+                        className="text-gray-500 font-bold text-sm hover:text-brand transition-colors"
+                    >
+                        Forgot password?
+                    </button>
                 </div>
                 
                 {/* Submit Button */}

@@ -204,6 +204,12 @@ export async function apiFetch<T = any>(
     requestHeaders.Authorization = `Bearer ${token}`;
   }
 
+  // Validate path is not undefined
+  if (!path || path === 'undefined' || path === 'null') {
+    console.error('[apiFetch] Invalid path provided:', path);
+    throw new Error(`Invalid API endpoint path: ${path}. Please check that the endpoint is properly defined in constants/endpoints.ts`);
+  }
+
   // Build full URL using API_BASE from environment
   const url = `${API_BASE}${path}`;
   console.log('[apiFetch]', method, url, isLocalhostApi ? '(localhost - CSRF enabled)' : '(production - token auth only)');
@@ -248,10 +254,17 @@ export async function apiFetch<T = any>(
     // Handle errors
     if (!response.ok) {
       if (response.status === 401) {
-        console.warn('[apiFetch] Unauthorized - token may be invalid');
-        // Clear invalid token from storage
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_user');
+        // Only clear token if one was provided (it might be invalid)
+        // If no token was provided, this is expected for protected endpoints
+        if (token) {
+          console.warn('[apiFetch] Unauthorized - token may be invalid');
+          // Clear invalid token from storage
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('auth_user');
+        } else {
+          // No token provided - this is expected for unauthenticated requests to protected endpoints
+          // Don't log as warning, just handle it gracefully
+        }
       }
       
       // Provide more specific error messages for common status codes
@@ -337,7 +350,14 @@ export async function apiFetch<T = any>(
 
     return data;
   } catch (error: any) {
-    console.error('[apiFetch][error]', method, url, error?.message || error);
+    // Don't log 401 errors as errors when no token was provided (expected behavior)
+    const isUnauthenticatedError = error?.message && 
+      (error.message.includes('Unauthenticated') || error.message.includes('Unauthorized')) &&
+      !token;
+    
+    if (!isUnauthenticatedError) {
+      console.error('[apiFetch][error]', method, url, error?.message || error);
+    }
     
     // Provide more helpful error messages for common network issues
     if (error.name === 'TypeError' && error.message === 'Failed to fetch') {

@@ -7,7 +7,7 @@ export interface IconProps {
   color?: string;
 }
 
-export type ScreenState = 'welcome' | 'signin' | 'signup_phone' | 'signup_otp' | 'setup_profile' | 'home' | 'match_requests' | 'chat' | 'edit_profile' | 'item_details' | 'public_profile';
+export type ScreenState = 'welcome' | 'signin' | 'signup' | 'signup_email_otp' | 'setup_profile' | 'forgot_password' | 'reset_password' | 'home' | 'match_requests' | 'chat' | 'edit_profile' | 'item_details' | 'public_profile';
 
 export type TabState = 'discover' | 'upload' | 'matches' | 'profile';
 
@@ -17,6 +17,7 @@ export interface FeatureItem {
 }
 
 export interface Owner {
+    id?: string;  // Seller's user ID for starting conversations
     name: string;
     image: string;
     location: string;
@@ -31,6 +32,7 @@ export interface BarterItem {
     image: string;
     description: string;
     lookingFor: string;
+    category?: string;
     owner: Owner;
     gallery?: string[];
 }
@@ -42,6 +44,7 @@ export interface MarketplaceItem {
     price: string;
     image: string;
     description: string;
+    category?: string;
     owner: Owner;
     gallery?: string[];
 }

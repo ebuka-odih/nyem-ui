@@ -3,18 +3,28 @@ import { Button } from './Button';
 import { ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
-interface SignUpOtpScreenProps {
-  phoneNumber: string;
+interface SignUpEmailOtpScreenProps {
+  email: string;
+  name: string;
+  password: string;
   onVerify: (isNewUser: boolean) => void;
   onBack: () => void;
 }
 
-export const SignUpOtpScreen: React.FC<SignUpOtpScreenProps> = ({ phoneNumber, onVerify, onBack }) => {
+export const SignUpEmailOtpScreen: React.FC<SignUpEmailOtpScreenProps> = ({ 
+  email, 
+  name, 
+  password, 
+  onVerify, 
+  onBack 
+}) => {
   const [otp, setOtp] = useState<string[]>(new Array(6).fill(""));
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [loading, setLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { verifyOtp } = useAuth();
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const { verifyOtp, sendEmailOtp } = useAuth();
 
   const handleChange = (element: HTMLInputElement, index: number) => {
     if (isNaN(Number(element.value))) return false;
@@ -35,6 +45,30 @@ export const SignUpOtpScreen: React.FC<SignUpOtpScreenProps> = ({ phoneNumber, o
     }
   };
 
+  const handlePaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text');
+    
+    // Extract only numeric characters from pasted text
+    const numericCode = pastedData.replace(/\D/g, '').slice(0, 6);
+    
+    if (numericCode.length > 0) {
+      const newOtp = [...otp];
+      
+      // Fill OTP inputs with pasted code
+      for (let i = 0; i < 6; i++) {
+        newOtp[i] = numericCode[i] || '';
+      }
+      
+      setOtp(newOtp);
+      
+      // Focus the next empty input or the last input if all are filled
+      const nextEmptyIndex = newOtp.findIndex((digit) => !digit);
+      const focusIndex = nextEmptyIndex !== -1 ? nextEmptyIndex : 5;
+      inputRefs.current[focusIndex]?.focus();
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -47,10 +81,11 @@ export const SignUpOtpScreen: React.FC<SignUpOtpScreenProps> = ({ phoneNumber, o
 
     setLoading(true);
     try {
-      const fullPhone = `+234${phoneNumber}`;
       const result = await verifyOtp({
-        phone: fullPhone,
+        email: email,
         code: otpCode,
+        name: name,
+        password: password,
       });
       onVerify(result.new_user);
     } catch (err: any) {
@@ -64,8 +99,27 @@ export const SignUpOtpScreen: React.FC<SignUpOtpScreenProps> = ({ phoneNumber, o
     }
   };
 
-  useEffect(() => {
+  const handleResend = async () => {
+    setError(null);
+    setSuccessMessage(null);
+    setResendLoading(true);
+    try {
+      await sendEmailOtp(email);
+      setSuccessMessage('A new OTP code has been sent to your email.');
+      // Clear OTP inputs
+      setOtp(new Array(6).fill(""));
       inputRefs.current[0]?.focus();
+      // Clear success message after 5 seconds
+      setTimeout(() => setSuccessMessage(null), 5000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to resend OTP. Please try again.');
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    inputRefs.current[0]?.focus();
   }, []);
 
   return (
@@ -91,7 +145,7 @@ export const SignUpOtpScreen: React.FC<SignUpOtpScreenProps> = ({ phoneNumber, o
             
             <form onSubmit={handleSubmit} className="flex flex-col flex-1">
                 <p className="text-gray-500 font-medium mb-8 text-center px-4 text-sm md:text-base">
-                    We sent a code to <span className="text-gray-700 font-semibold">+234{phoneNumber}</span>
+                    We sent a code to <span className="text-gray-700 font-semibold">{email}</span>
                 </p>
 
                 {/* Error Message */}
@@ -101,7 +155,14 @@ export const SignUpOtpScreen: React.FC<SignUpOtpScreenProps> = ({ phoneNumber, o
                     </div>
                 )}
 
-                {/* OTP Inputs - Flex container ensures they fit on small screens */}
+                {/* Success Message */}
+                {successMessage && (
+                    <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm mb-4">
+                        {successMessage}
+                    </div>
+                )}
+
+                {/* OTP Inputs */}
                 <div className="flex justify-between gap-1 md:gap-2 mb-10 px-1">
                     {otp.map((data, index) => (
                         <input
@@ -112,6 +173,7 @@ export const SignUpOtpScreen: React.FC<SignUpOtpScreenProps> = ({ phoneNumber, o
                             value={data}
                             onChange={(e) => handleChange(e.target, index)}
                             onKeyDown={(e) => handleKeyDown(e, index)}
+                            onPaste={index === 0 ? handlePaste : undefined}
                             className="flex-1 min-w-0 h-12 md:h-14 max-w-[50px] border border-gray-300 rounded-lg text-center text-xl md:text-2xl font-bold text-gray-800 focus:border-brand focus:ring-1 focus:ring-brand focus:outline-none transition-all bg-gray-50 p-0"
                             inputMode="numeric"
                         />
@@ -131,8 +193,13 @@ export const SignUpOtpScreen: React.FC<SignUpOtpScreenProps> = ({ phoneNumber, o
                 </div>
 
                 <div className="mt-8 text-center">
-                    <button type="button" className="text-brand font-bold hover:text-brand-dark transition-colors">
-                        Resend OTP
+                    <button 
+                        type="button" 
+                        onClick={handleResend}
+                        disabled={resendLoading || loading}
+                        className="text-brand font-bold hover:text-brand-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {resendLoading ? 'Sending...' : 'Resend OTP'}
                     </button>
                 </div>
             </form>
@@ -140,3 +207,5 @@ export const SignUpOtpScreen: React.FC<SignUpOtpScreenProps> = ({ phoneNumber, o
     </div>
   );
 };
+
+

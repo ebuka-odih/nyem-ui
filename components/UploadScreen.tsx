@@ -1,11 +1,18 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, ChevronDown, Image as ImageIcon, X } from 'lucide-react';
-import { Button } from './Button';
 import { useAuth } from '../contexts/AuthContext';
 import { apiFetch } from '../utils/api';
 import { ENDPOINTS } from '../constants/endpoints';
 import { AppHeader } from './AppHeader';
+import { LoginPrompt } from './common/LoginPrompt';
+import { UploadTabs } from './upload/UploadTabs';
+import { PhotoUpload } from './upload/PhotoUpload';
+import { UploadForm } from './upload/UploadForm';
+import { PhoneVerificationModal } from './PhoneVerificationModal';
+import { PreUploadProfileSetup } from './upload/PreUploadProfileSetup';
+
+// Number of items users can upload before phone verification is required
+const FREE_UPLOAD_LIMIT = 2;
 
 interface Category {
   id: number;
@@ -13,51 +20,115 @@ interface Category {
   order: number;
 }
 
-export const UploadScreen: React.FC = () => {
-  const { token } = useAuth();
-  const [activeTab, setActiveTab] = useState<'exchange' | 'marketplace'>('exchange');
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('');
-  const [condition, setCondition] = useState('');
-  const [lookingFor, setLookingFor] = useState('');
-  const [price, setPrice] = useState('');
-  const [photos, setPhotos] = useState<string[]>([]);
+interface EditItem {
+  id: number;
+  title: string;
+  description?: string;
+  condition?: string;
+  category_id?: number;
+  type?: string;
+  price?: string;
+  looking_for?: string;
+  images?: string[];
+  gallery?: string[];
+}
+
+interface UploadScreenProps {
+  onLoginRequest?: (method: 'google' | 'email') => void;
+  onSignUpRequest?: () => void;
+  editItem?: EditItem | null;
+  onEditComplete?: () => void;
+}
+
+export const UploadScreen: React.FC<UploadScreenProps> = ({ 
+  onLoginRequest, 
+  onSignUpRequest,
+  editItem = null,
+  onEditComplete
+}) => {
+  const { token, user, isAuthenticated, refreshUser } = useAuth();
+  const isEditMode = !!editItem;
+  
+  // Determine initial tab based on edit item type or default to Marketplace
+  const getInitialTab = (): 'Marketplace' | 'Services' | 'Swap' => {
+    if (editItem?.type === 'barter') return 'Swap';
+    if (editItem?.type === 'services') return 'Services';
+    return 'Marketplace';
+  };
+  
+  const [activeTab, setActiveTab] = useState<'Marketplace' | 'Services' | 'Swap'>(getInitialTab());
+  const [showPreUploadProfile, setShowPreUploadProfile] = useState(false);
+  const [title, setTitle] = useState(editItem?.title || '');
+  const [description, setDescription] = useState(editItem?.description || '');
+  const [category, setCategory] = useState(editItem?.category_id?.toString() || '');
+  const [condition, setCondition] = useState(editItem?.condition || '');
+  const [lookingFor, setLookingFor] = useState(editItem?.looking_for || '');
+  const [price, setPrice] = useState(editItem?.price ? editItem.price.replace('$', '').replace(',', '') : '');
+  const [photos, setPhotos] = useState<string[]>(editItem?.images || editItem?.gallery || []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
+  const [showPhoneVerification, setShowPhoneVerification] = useState(false);
+  const [pendingSubmit, setPendingSubmit] = useState(false); // Track if we need to retry submit after verification
   
   // Refs for file inputs
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch categories on mount
+  // Check if pre-upload profile setup is needed (first time upload)
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      // Check if user needs to complete profile before uploading
+      // Required: display name, username, and city. Profile photo is recommended but optional.
+      const needsProfileSetup = !user.name || !user.username || !user.city_id;
+      setShowPreUploadProfile(needsProfileSetup);
+    } else if (!isAuthenticated) {
+      // If not authenticated, show login prompt (handled by parent)
+      setShowPreUploadProfile(false);
+    }
+  }, [isAuthenticated, user]);
+
+  // Calculate items count and verification requirements
+  const itemsCount = user?.items_count ?? 0;
+  const needsPhoneVerification = !user?.phone_verified_at && itemsCount >= FREE_UPLOAD_LIMIT;
+  const remainingFreeUploads = Math.max(0, FREE_UPLOAD_LIMIT - itemsCount);
+
+  // Map activeTab to parent category name for filtering
+  const getParentCategoryName = (tab: 'Marketplace' | 'Services' | 'Swap'): string => {
+    // Map Marketplace to Shop for backend API (backend uses 'Shop' as parent category)
+    if (tab === 'Marketplace') return 'Shop';
+    return tab; // Services or Swap
+  };
+
+  // Fetch categories filtered by active tab
   useEffect(() => {
     const fetchCategories = async () => {
       try {
         setLoadingCategories(true);
-        const response = await apiFetch(ENDPOINTS.categories);
+        
+        // Reset category selection when tab changes
+        setCategory('');
+        
+        // Fetch categories filtered by parent (based on activeTab)
+        const parentCategory = getParentCategoryName(activeTab);
+        const categoriesUrl = `${ENDPOINTS.categories}?parent=${encodeURIComponent(parentCategory)}`;
+        
+        const response = await apiFetch(categoriesUrl);
         const cats = (response.categories || []) as Category[];
         setCategories(cats);
       } catch (err) {
         console.error('Failed to fetch categories:', err);
-        // Fallback to hardcoded categories
-        setCategories([
-          { id: 1, name: 'Electronics', order: 1 },
-          { id: 2, name: 'Fashion', order: 2 },
-          { id: 3, name: 'Home & Garden', order: 3 },
-          { id: 4, name: 'Vehicles', order: 4 },
-          { id: 5, name: 'Other', order: 5 },
-        ]);
+        // Fallback to empty array
+        setCategories([]);
       } finally {
         setLoadingCategories(false);
       }
     };
 
     fetchCategories();
-  }, []);
+  }, [activeTab]);
 
   // Handle camera capture (instant snap only)
   const handleCameraCapture = () => {
@@ -111,6 +182,36 @@ export const UploadScreen: React.FC = () => {
     setPhotos(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Reset form when editItem changes
+  useEffect(() => {
+    if (editItem) {
+      setTitle(editItem.title || '');
+      setDescription(editItem.description || '');
+      setCategory(editItem.category_id?.toString() || '');
+      setCondition(editItem.condition || '');
+      setLookingFor(editItem.looking_for || '');
+      setPrice(editItem.price ? editItem.price.replace('$', '').replace(',', '') : '');
+      setPhotos(editItem.images || editItem.gallery || []);
+      // Set active tab based on item type
+      if (editItem.type === 'barter') {
+        setActiveTab('Swap');
+      } else if (editItem.type === 'services') {
+        setActiveTab('Services');
+      } else {
+        setActiveTab('Marketplace');
+      }
+    } else {
+      // Reset form for new item
+      setTitle('');
+      setDescription('');
+      setCategory('');
+      setCondition('');
+      setLookingFor('');
+      setPrice('');
+      setPhotos([]);
+    }
+  }, [editItem]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -128,11 +229,11 @@ export const UploadScreen: React.FC = () => {
       setError('Condition is required');
       return;
     }
-    if (activeTab === 'exchange' && !lookingFor.trim()) {
+    if (activeTab === 'Swap' && !lookingFor.trim()) {
       setError('Please specify what you are looking for');
       return;
     }
-    if (activeTab === 'marketplace' && !price.trim()) {
+    if (activeTab === 'Marketplace' && !price.trim()) {
       setError('Price is required');
       return;
     }
@@ -142,11 +243,20 @@ export const UploadScreen: React.FC = () => {
       return;
     }
 
+    // Check if phone verification is required (only for new items, not edits)
+    // Users can upload up to FREE_UPLOAD_LIMIT items without verification
+    // After that, phone verification is required to upload more items
+    if (!isEditMode && user && !user.phone_verified_at && itemsCount >= FREE_UPLOAD_LIMIT) {
+      setPendingSubmit(true); // Mark that we have a pending submission
+      setShowPhoneVerification(true);
+      return;
+    }
+
     setLoading(true);
     try {
-      // Find category name from selected category ID
-      const selectedCategoryObj = categories.find(cat => cat.id.toString() === category);
-      if (!selectedCategoryObj) {
+      // Validate category ID
+      const categoryId = parseInt(category, 10);
+      if (!categoryId || isNaN(categoryId)) {
         setError('Please select a valid category');
         setLoading(false);
         return;
@@ -161,16 +271,17 @@ export const UploadScreen: React.FC = () => {
       const payload: any = {
         title: title.trim(),
         description: description.trim() || undefined,
-        category: selectedCategoryObj.name, // Backend expects category name, not ID
+        category_id: categoryId, // Backend now expects category_id
         condition: conditionValue,
-        type: activeTab === 'exchange' ? 'barter' : 'marketplace',
+        type: activeTab === 'Swap' ? 'barter' : activeTab === 'Marketplace' ? 'marketplace' : 'services',
       };
 
-      if (activeTab === 'exchange') {
+      if (activeTab === 'Swap') {
         payload.looking_for = lookingFor.trim();
-      } else {
+      } else if (activeTab === 'Marketplace') {
         payload.price = parseFloat(price.replace(/,/g, ''));
       }
+      // Services items might not need price or looking_for, depending on backend requirements
 
       // TODO: Implement image upload endpoint
       // For now, photos are stored locally but not sent to backend
@@ -180,58 +291,98 @@ export const UploadScreen: React.FC = () => {
       //   payload.photos = uploadedPhotoUrls;
       // }
 
-      await apiFetch(ENDPOINTS.items.create, {
-        method: 'POST',
+      // Use PUT for updates, POST for new items
+      const endpoint = isEditMode 
+        ? ENDPOINTS.items.update(editItem!.id)
+        : ENDPOINTS.items.create;
+      
+      const method = isEditMode ? 'PUT' : 'POST';
+
+      await apiFetch(endpoint, {
+        method,
         token,
         body: payload,
       });
 
       setSuccess(true);
-      // Reset form
-      setTitle('');
-      setDescription('');
-      setCategory('');
-      setCondition('');
-      setLookingFor('');
-      setPrice('');
-      setPhotos([]);
+      
+      // Refresh user to update items_count after successful upload
+      await refreshUser();
+      
+      // Reset form only if not in edit mode
+      if (!isEditMode) {
+        setTitle('');
+        setDescription('');
+        setCategory('');
+        setCondition('');
+        setLookingFor('');
+        setPrice('');
+        setPhotos([]);
+      }
 
-      setTimeout(() => {
-        setSuccess(false);
-      }, 3000);
+      // Call onEditComplete callback if provided
+      if (isEditMode && onEditComplete) {
+        setTimeout(() => {
+          onEditComplete();
+        }, 1500);
+      } else {
+        setTimeout(() => {
+          setSuccess(false);
+        }, 3000);
+      }
     } catch (err: any) {
-      setError(err.message || 'Failed to post item. Please try again.');
+      // Check if error is due to phone verification requirement
+      if (err.message?.includes('phone verification') || err.message?.includes('requires_phone_verification')) {
+        setShowPhoneVerification(true);
+        setError(null);
+      } else {
+        setError(err.message || (isEditMode ? 'Failed to update item. Please try again.' : 'Failed to post item. Please try again.'));
+      }
       console.error('Upload error:', err);
     } finally {
       setLoading(false);
     }
   };
 
+  // Show login prompt if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="flex flex-col h-full bg-white relative">
+        <AppHeader 
+          title="Upload"
+          className="pb-4"
+        />
+        <LoginPrompt 
+          title="Sign In Required"
+          message="Please sign in to upload items and start trading with others."
+          onLoginRequest={onLoginRequest}
+          onSignUpRequest={onSignUpRequest}
+        />
+      </div>
+    );
+  }
+
+  // Show profile setup for first-time uploaders (new users without complete profile)
+  if (showPreUploadProfile && !isEditMode) {
+    return (
+      <div className="flex flex-col h-full bg-white relative">
+        <PreUploadProfileSetup
+          onComplete={() => setShowPreUploadProfile(false)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-white relative">
       {/* Header */}
       <AppHeader 
-        title="Upload"
+        title={isEditMode ? "Edit Item" : "Upload"}
         className="pb-4"
       />
         
       {/* Tabs */}
-      <div className="px-6 pb-4">
-        <div className="bg-gray-100 p-1 rounded-full flex items-center">
-          <button 
-            className={`flex-1 py-2 rounded-full text-sm font-bold transition-all text-center ${activeTab === 'exchange' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
-            onClick={() => setActiveTab('exchange')}
-          >
-            Exchange Item
-          </button>
-          <button 
-            className={`flex-1 py-2 rounded-full text-sm font-bold transition-all text-center ${activeTab === 'marketplace' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
-            onClick={() => setActiveTab('marketplace')}
-          >
-            Marketplace Item
-          </button>
-        </div>
-      </div>
+      <UploadTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Hidden file inputs */}
       <input
@@ -254,10 +405,56 @@ export const UploadScreen: React.FC = () => {
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
         
+        {/* Verification Banner - Show different messages based on item count */}
+        {user && !user.phone_verified_at && (
+          <div className={`rounded-xl p-4 ${needsPhoneVerification ? 'bg-amber-50 border border-amber-200' : 'bg-blue-50 border border-blue-200'}`}>
+            <div className="flex items-start space-x-3">
+              <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${needsPhoneVerification ? 'bg-amber-100' : 'bg-blue-100'}`}>
+                <svg className={`w-5 h-5 ${needsPhoneVerification ? 'text-amber-600' : 'text-blue-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                {needsPhoneVerification ? (
+                  <>
+                    <h3 className="text-amber-800 font-semibold text-sm">Verify to Upload More Items</h3>
+                    <p className="text-amber-700 text-xs mt-1 leading-relaxed">
+                      You've reached the limit of {FREE_UPLOAD_LIMIT} free uploads. Verify your phone number to continue uploading items and build trust in our community.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowPhoneVerification(true)}
+                      className="mt-3 text-amber-700 font-bold text-sm hover:text-amber-800 underline underline-offset-2"
+                    >
+                      Verify Now →
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="text-blue-800 font-semibold text-sm">
+                      {remainingFreeUploads} Free Upload{remainingFreeUploads !== 1 ? 's' : ''} Remaining
+                    </h3>
+                    <p className="text-blue-700 text-xs mt-1 leading-relaxed">
+                      You can upload {remainingFreeUploads} more item{remainingFreeUploads !== 1 ? 's' : ''} before verifying your phone. Verify now to unlock unlimited uploads!
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowPhoneVerification(true)}
+                      className="mt-3 text-blue-700 font-bold text-sm hover:text-blue-800 underline underline-offset-2"
+                    >
+                      Verify Early →
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Success/Error Messages */}
         {success && (
             <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
-                Item posted successfully!
+                {isEditMode ? 'Item updated successfully!' : 'Item posted successfully!'}
             </div>
         )}
         {error && (
@@ -268,192 +465,77 @@ export const UploadScreen: React.FC = () => {
 
         {/* Title Section */}
         <div>
-           <h2 className="text-2xl font-extrabold text-gray-900 mb-1">Upload Item</h2>
+           <h2 className="text-2xl font-extrabold text-gray-900 mb-1">
+             {isEditMode ? 'Edit Item' : 'Upload Item'}
+           </h2>
            <p className="text-gray-500 text-sm">
-             {activeTab === 'exchange' ? 'What would you like to trade?' : 'What would you like to sell?'}
+             {isEditMode 
+               ? 'Update your item details below'
+               : activeTab === 'Swap' 
+                 ? 'What would you like to trade?' 
+                 : activeTab === 'Marketplace' 
+                   ? 'What would you like to sell?' 
+                   : 'What service would you like to offer?'}
            </p>
         </div>
 
         {/* Photo Upload */}
-        <div>
-            <label className="block text-brand font-bold text-sm mb-3">
-              Photos {activeTab === 'exchange' ? '(Camera Only)' : '(Select from Gallery)'}
-            </label>
-            <div className="flex space-x-3 overflow-x-auto pb-2">
-              {activeTab === 'exchange' ? (
-                // Camera only for exchange items
-                <>
-                  {photos.length === 0 ? (
-                    <button 
-                      type="button"
-                      onClick={handleCameraCapture}
-                      className="w-24 h-24 rounded-2xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 hover:border-brand hover:text-brand hover:bg-brand/5 transition-colors shrink-0"
-                    >
-                      <Camera size={24} className="mb-1" />
-                      <span className="text-[10px] font-bold">Take Photo</span>
-                    </button>
-                  ) : (
-                    photos.map((photo, index) => (
-                      <div key={index} className="relative w-24 h-24 rounded-2xl overflow-hidden shrink-0 border-2 border-gray-200">
-                        <img src={photo} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => removePhoto(index)}
-                          className="absolute top-1 right-1 w-6 h-6 bg-black/50 rounded-full flex items-center justify-center text-white hover:bg-black/70 transition-colors"
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-                    ))
-                  )}
-                  {photos.length > 0 && photos.length < 5 && (
-                    <button 
-                      type="button"
-                      onClick={handleCameraCapture}
-                      className="w-24 h-24 rounded-2xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 hover:border-brand hover:text-brand hover:bg-brand/5 transition-colors shrink-0"
-                    >
-                      <Camera size={24} className="mb-1" />
-                      <span className="text-[10px] font-bold">Add Photo</span>
-                    </button>
-                  )}
-                </>
-              ) : (
-                // Gallery selection for marketplace items
-                <>
-                  {photos.map((photo, index) => (
-                    <div key={index} className="relative w-24 h-24 rounded-2xl overflow-hidden shrink-0 border-2 border-gray-200">
-                      <img src={photo} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => removePhoto(index)}
-                        className="absolute top-1 right-1 w-6 h-6 bg-black/50 rounded-full flex items-center justify-center text-white hover:bg-black/70 transition-colors"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ))}
-                  {photos.length < 10 && (
-                    <button 
-                      type="button"
-                      onClick={handleGallerySelect}
-                      className="w-24 h-24 rounded-2xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 hover:border-brand hover:text-brand hover:bg-brand/5 transition-colors shrink-0"
-                    >
-                      <ImageIcon size={24} className="mb-1" />
-                      <span className="text-[10px] font-bold">Add Photo</span>
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-        </div>
+        <PhotoUpload
+          photos={photos}
+          activeTab={activeTab}
+          onCameraCapture={handleCameraCapture}
+          onGallerySelect={handleGallerySelect}
+          onRemovePhoto={removePhoto}
+        />
 
         {/* Form Fields */}
-        <div className="space-y-6">
-            {/* Title */}
-            <div>
-                <label className="block text-brand font-bold text-sm mb-2">Title *</label>
-                <input 
-                    type="text" 
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="e.g., iPhone 13 Pro" 
-                    className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all"
-                />
-            </div>
-
-            {/* Description */}
-            <div>
-                <label className="block text-brand font-bold text-sm mb-2">Description</label>
-                <textarea 
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Describe your item..." 
-                    className="w-full h-24 px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all resize-none"
-                ></textarea>
-            </div>
-
-            {/* Category */}
-            <div>
-                <label className="block text-brand font-bold text-sm mb-2">Category *</label>
-                <div className="relative">
-                    <select 
-                        value={category}
-                        onChange={(e) => setCategory(e.target.value)}
-                        disabled={loadingCategories}
-                        className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <option value="" disabled>Select category</option>
-                        {categories.map((cat) => (
-                          <option key={cat.id} value={cat.id.toString()}>
-                            {cat.name}
-                          </option>
-                        ))}
-                    </select>
-                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
-                </div>
-            </div>
-
-            {/* Condition */}
-            <div>
-                <label className="block text-brand font-bold text-sm mb-2">Condition *</label>
-                <div className="relative">
-                    <select 
-                        value={condition}
-                        onChange={(e) => setCondition(e.target.value)}
-                        className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all appearance-none cursor-pointer"
-                    >
-                        <option value="" disabled>Select condition</option>
-                        <option value="new">New</option>
-                        <option value="like_new">Like New</option>
-                        <option value="used">Used</option>
-                    </select>
-                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
-                </div>
-            </div>
-            
-            {/* Exchange-specific: Looking For */}
-            {activeTab === 'exchange' && (
-              <div>
-                <label className="block text-brand font-bold text-sm mb-2">Looking For *</label>
-                <input 
-                  type="text" 
-                  value={lookingFor}
-                  onChange={(e) => setLookingFor(e.target.value)}
-                  placeholder="What do you want in exchange?" 
-                  className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all"
-                />
-              </div>
-            )}
-
-            {/* Marketplace-specific: Price */}
-            {activeTab === 'marketplace' && (
-              <div>
-                <label className="block text-brand font-bold text-sm mb-2">Price (₦) *</label>
-                <input 
-                  type="text" 
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value.replace(/[^0-9,.]/g, ''))}
-                  placeholder="0.00" 
-                  className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all"
-                />
-              </div>
-            )}
-
-            {/* Submit */}
-            <form onSubmit={handleSubmit}>
-                <div className="pt-4 pb-8">
-                    <Button 
-                        fullWidth 
-                        type="submit"
-                        className="bg-brand hover:bg-brand-light text-white rounded-xl py-4 shadow-lg text-lg"
-                        disabled={loading}
-                    >
-                        {loading ? 'Posting...' : 'Post Item'}
-                    </Button>
-                </div>
-            </form>
-        </div>
+        <UploadForm
+          activeTab={activeTab}
+          title={title}
+          description={description}
+          category={category}
+          condition={condition}
+          lookingFor={lookingFor}
+          price={price}
+          categories={categories}
+          loadingCategories={loadingCategories}
+          loading={loading}
+          onTitleChange={setTitle}
+          onDescriptionChange={setDescription}
+          onCategoryChange={setCategory}
+          onConditionChange={setCondition}
+          onLookingForChange={setLookingFor}
+          onPriceChange={setPrice}
+          onSubmit={handleSubmit}
+        />
       </div>
+
+      {/* Phone Verification Modal */}
+      <PhoneVerificationModal
+        isOpen={showPhoneVerification}
+        onClose={() => {
+          setShowPhoneVerification(false);
+          setPendingSubmit(false);
+        }}
+        onVerified={async () => {
+          await refreshUser();
+          // If there was a pending submission, retry it after verification
+          if (pendingSubmit) {
+            setPendingSubmit(false);
+            // Small delay to ensure user state is updated
+            setTimeout(() => {
+              const form = document.querySelector('form');
+              if (form) {
+                form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+              }
+            }, 500);
+          }
+        }}
+        message={needsPhoneVerification 
+          ? `You've used your ${FREE_UPLOAD_LIMIT} free uploads! Verify your phone number to continue uploading items and build trust with buyers in our community.`
+          : undefined
+        }
+      />
     </div>
   );
 };

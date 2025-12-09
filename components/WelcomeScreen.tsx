@@ -1,85 +1,156 @@
 import React from 'react';
 import { Button } from './Button';
-import { Smartphone, Heart, Repeat } from 'lucide-react';
+import { ShoppingBag, Briefcase, RefreshCw, ArrowRight } from 'lucide-react';
 
 interface WelcomeScreenProps {
   onGetStarted: () => void;
+  onSignUp?: () => void;
 }
 
-export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onGetStarted }) => {
+export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onGetStarted, onSignUp }) => {
   return (
-    <div className="flex flex-col min-h-full bg-brand relative header-safe-top-brand">
+    <div className="flex flex-col h-full bg-gradient-to-br from-brand via-brand to-brand-dark relative overflow-hidden">
       
-      {/* Top Section: Branding */}
-      <div className="flex-grow flex flex-col items-center justify-center py-8 md:py-12 px-6 text-white z-10 shrink-0">
+      {/* Decorative Background Elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Floating circles for depth */}
+        <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-white/5 blur-3xl" />
+        <div className="absolute top-1/4 -left-32 w-96 h-96 rounded-full bg-white/3 blur-3xl" />
         
-        {/* Logo Circle */}
-        <div className="w-20 h-20 md:w-24 md:h-24 rounded-full border-2 border-white/30 flex items-center justify-center bg-white/10 mb-4 md:mb-6 backdrop-blur-sm shadow-xl">
-          <span className="text-4xl md:text-5xl font-extrabold tracking-tight">N</span>
-        </div>
-        
-        {/* App Name */}
-        <h1 className="text-3xl md:text-4xl font-extrabold tracking-wide mb-2">Nyem</h1>
-        
-        {/* Tagline */}
-        <p className="text-white/90 font-medium text-base md:text-lg tracking-wide">Tinder For Barter</p>
+        {/* Subtle grid pattern */}
+        <div 
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: `radial-gradient(circle at 1px 1px, white 1px, transparent 0)`,
+            backgroundSize: '40px 40px'
+          }}
+        />
       </div>
 
-      {/* Bottom Card Section */}
-      <div className="bg-white rounded-t-[36px] w-full px-6 md:px-8 pt-8 md:pt-10 pb-8 md:pb-10 flex flex-col items-center shadow-[0_-10px_40px_rgba(0,0,0,0.2)] animate-in slide-in-from-bottom duration-500 shrink-0">
+      {/* Main Content Container */}
+      <div className="flex flex-col flex-1 relative z-10">
         
-        {/* Card Header */}
-        <div className="text-center mb-6 md:mb-8">
-          <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-2 md:mb-3">Swap. Match. Trade.</h2>
-          <p className="text-gray-500 text-sm md:text-base leading-relaxed max-w-[280px] mx-auto">
-            Turn your unused items into something you actually want
-          </p>
-        </div>
-
-        {/* Features List */}
-        <div className="w-full space-y-5 md:space-y-6 mb-8 md:mb-10">
+        {/* Hero Section */}
+        <div className="shrink-0 flex flex-col items-center px-6 pt-14 pb-8">
           
-          {/* Item 1 */}
-          <div className="flex items-center space-x-5">
-            <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-              <Smartphone className="w-5 h-5 md:w-6 md:h-6 text-gray-800" strokeWidth={2.5} />
-            </div>
-            <span className="text-gray-800 font-semibold text-base md:text-lg">Swipe to discover items</span>
+          {/* Logo - using transform to scale and reduce visible padding */}
+          <div className="animate-[fadeIn_0.6s_ease-out] mb-6">
+            <img 
+              src="/img/logo.png" 
+              alt="Nyem Logo" 
+              className="h-16 w-auto object-contain drop-shadow-2xl transform scale-[1.4] origin-center"
+            />
           </div>
 
-          {/* Item 2 */}
-          <div className="flex items-center space-x-5">
-            <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-green-50 flex items-center justify-center flex-shrink-0">
-              <Heart className="w-5 h-5 md:w-6 md:h-6 text-green-500 fill-green-500" />
-            </div>
-            <span className="text-gray-800 font-semibold text-base md:text-lg">Match with traders</span>
-          </div>
+          {/* Tagline */}
+          <h1 className="text-white text-2xl font-bold tracking-wide text-center animate-[fadeIn_0.6s_ease-out_0.1s_both] mb-3">
+            Your Local Marketplace
+          </h1>
 
-          {/* Item 3 */}
-          <div className="flex items-center space-x-5">
-            <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
-              <Repeat className="w-5 h-5 md:w-6 md:h-6 text-blue-500" strokeWidth={2.5} />
-            </div>
-            <span className="text-gray-800 font-semibold text-base md:text-lg">Trade locally</span>
-          </div>
-
-        </div>
-
-        {/* Action Button */}
-        <div className="w-full">
-          <Button fullWidth onClick={onGetStarted}>
-            Get Started
-          </Button>
-        </div>
-
-        {/* Footer Legal */}
-        <div className="mt-6 md:mt-7 text-center">
-          <p className="text-xs text-gray-400 leading-normal">
-            By continuing, you agree to our <a href="#" className="font-bold underline decoration-1">Terms of Use</a> and <a href="#" className="font-bold underline decoration-1 text-brand">Privacy Policy</a>
+          {/* Description */}
+          <p className="text-white/70 text-center text-sm leading-relaxed max-w-xs animate-[fadeIn_0.4s_ease-out_0.2s_both]">
+            Connect with your community to buy, sell, trade, and hire — all in one app.
           </p>
         </div>
 
+        {/* Features & CTA Section - Takes remaining space */}
+        <div className="flex-1 bg-white rounded-t-[2rem] px-6 pt-6 pb-6 shadow-[0_-20px_60px_rgba(0,0,0,0.15)] animate-[slideUp_0.5s_ease-out_0.2s_both] flex flex-col">
+
+          {/* Feature Pills */}
+          <div className="flex flex-col gap-3 mb-6">
+            
+            {/* Marketplace Feature */}
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-brand/5 border border-brand/8">
+              <div className="w-11 h-11 rounded-lg bg-brand/10 flex items-center justify-center shrink-0">
+                <ShoppingBag size={20} className="text-brand" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-900 text-sm">Marketplace</h3>
+                <p className="text-gray-500 text-xs">Buy & sell from local sellers</p>
+              </div>
+            </div>
+
+            {/* Services Feature */}
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-brand/5 border border-brand/8">
+              <div className="w-11 h-11 rounded-lg bg-brand/10 flex items-center justify-center shrink-0">
+                <Briefcase size={20} className="text-brand" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-900 text-sm">Services</h3>
+                <p className="text-gray-500 text-xs">Hire skilled professionals nearby</p>
+              </div>
+            </div>
+
+            {/* Swap Feature */}
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-brand/5 border border-brand/8">
+              <div className="w-11 h-11 rounded-lg bg-brand/10 flex items-center justify-center shrink-0">
+                <RefreshCw size={20} className="text-brand" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-900 text-sm">Swap</h3>
+                <p className="text-gray-500 text-xs">Trade items — no cash needed</p>
+              </div>
+            </div>
+          </div>
+
+          {/* CTA Button */}
+          <div className="mt-3 animate-[fadeIn_0.4s_ease-out_0.7s_both]">
+            <Button 
+              fullWidth 
+              onClick={onGetStarted} 
+              className="py-3.5 text-base font-bold rounded-2xl shadow-lg shadow-brand/25 hover:shadow-xl hover:shadow-brand/30 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 group"
+            >
+              <span>Start Exploring</span>
+              <ArrowRight size={18} className="ml-2 group-hover:translate-x-1 transition-transform" />
+            </Button>
+          </div>
+
+          {/* Create Account Link */}
+          <p className="mt-4 text-center text-sm text-gray-500 animate-[fadeIn_0.4s_ease-out_0.75s_both]">
+            Ready to join? <button onClick={onSignUp || onGetStarted} className="text-brand font-semibold hover:underline">Create an account</button>
+          </p>
+
+          {/* Legal Footer */}
+          <div className="mt-6 text-center animate-[fadeIn_0.4s_ease-out_0.8s_both]">
+            <p className="text-xs text-gray-400 leading-relaxed">
+              By continuing, you agree to our{' '}
+              <a href="#" className="text-brand font-semibold hover:underline underline-offset-2">
+                Terms of Use
+              </a>{' '}
+              and{' '}
+              <a href="#" className="text-brand font-semibold hover:underline underline-offset-2">
+                Privacy Policy
+              </a>
+            </p>
+          </div>
+
+        </div>
       </div>
+
+      {/* CSS Animations */}
+      <style>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(40px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </div>
   );
 };
