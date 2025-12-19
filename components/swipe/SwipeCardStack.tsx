@@ -14,6 +14,7 @@ interface SwipeCardStackProps {
   likedItems?: Set<number>;
   showWelcomeCard?: boolean;
   showPromoCard?: boolean;
+  currentUserId?: string | number; // Current user's ID to check if item belongs to them
   onLike?: (itemId: number, isCurrentlyLiked: boolean) => void;
   onSwipeLeft: () => void;
   onSwipeRight: () => void;
@@ -31,6 +32,7 @@ export const SwipeCardStack: React.FC<SwipeCardStackProps> = ({
   likedItems = new Set(),
   showWelcomeCard = false,
   showPromoCard = false,
+  currentUserId,
   onLike,
   onSwipeLeft,
   onSwipeRight,
@@ -51,10 +53,21 @@ export const SwipeCardStack: React.FC<SwipeCardStackProps> = ({
 
   const currentItem = items[currentIndex];
   const nextItem = items[currentIndex + 1];
+  
+  // Check if current item belongs to the current user
+  const isOwnItem = currentItem && currentUserId && currentItem.owner?.id 
+    ? String(currentItem.owner.id) === String(currentUserId)
+    : false;
 
   const handleDragEnd = async (event: any, info: PanInfo) => {
     if (info.offset.x > 100) {
-      onSwipeRight();
+      // Only allow swipe right if it's not the user's own item
+      if (!isOwnItem) {
+        onSwipeRight();
+      } else {
+        // Reset position if trying to swipe right on own item
+        controls.start({ x: 0, rotate: 0 });
+      }
     } else if (info.offset.x < -100) {
       await swipe('left');
     } else {
@@ -78,7 +91,7 @@ export const SwipeCardStack: React.FC<SwipeCardStackProps> = ({
         {loading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 z-0 bg-white rounded-[24px] border border-gray-100 shadow-sm">
             <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-              <Loader2 size={32} className="text-[#990033] animate-spin" />
+              <Loader2 size={32} className="text-brand animate-spin" />
             </div>
             <h3 className="text-lg font-bold text-gray-800 mb-2">Loading items...</h3>
             <p className="text-gray-500 text-sm">Please wait while we fetch the latest listings.</p>
@@ -189,8 +202,8 @@ export const SwipeCardStack: React.FC<SwipeCardStackProps> = ({
             style={{ x, rotate, opacity }}
             animate={controls}
             drag="x"
-            dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={0.7}
+            dragConstraints={{ left: -200, right: isOwnItem ? 0 : 200 }} // Prevent right drag on own items
+            dragElastic={isOwnItem ? { left: 0.7, right: 0 } : 0.7} // Disable right drag elastic on own items
             onDragEnd={handleDragEnd}
             whileTap={{ scale: 1.005 }}
           >
@@ -199,7 +212,7 @@ export const SwipeCardStack: React.FC<SwipeCardStackProps> = ({
               isLiked={likedItems.has(currentItem.id)}
               onLike={onLike ? () => onLike(currentItem.id, likedItems.has(currentItem.id)) : undefined}
               onInfoClick={() => onItemClick(currentItem)}
-              onBuyClick={onSwipeRight}
+              onBuyClick={isOwnItem ? undefined : onSwipeRight} // Disable buy button on own items
             />
           </motion.div>
         )}
@@ -237,12 +250,13 @@ export const SwipeCardStack: React.FC<SwipeCardStackProps> = ({
                 await controls.start({ x: 500, opacity: 0 });
                 x.set(0);
                 onPromoCardDismiss?.();
-              } else if (currentItem) {
+              } else if (currentItem && !isOwnItem) {
                 onSwipeRight();
               }
             }}
-            disabled={!currentItem && !showWelcomeCard && !showPromoCard}
-            className="w-16 h-16 rounded-full bg-white border border-green-100 shadow-[0_4px_20px_rgba(34,197,94,0.15)] flex items-center justify-center text-green-500 active:scale-90 transition-all hover:shadow-xl hover:scale-105 disabled:opacity-40 disabled:scale-100 disabled:shadow-none"
+            disabled={(!currentItem && !showWelcomeCard && !showPromoCard) || isOwnItem}
+            className="w-16 h-16 rounded-full bg-white border border-green-100 shadow-[0_4px_20px_rgba(34,197,94,0.15)] flex items-center justify-center text-green-500 active:scale-90 transition-all hover:shadow-xl hover:scale-105 disabled:opacity-40 disabled:scale-100 disabled:shadow-none disabled:cursor-not-allowed"
+            title={isOwnItem ? "You can't like your own item" : "Swipe right"}
           >
             <Check size={32} strokeWidth={3} />
           </button>

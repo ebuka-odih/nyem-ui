@@ -1,15 +1,69 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from './Button';
 import { ShoppingBag, Briefcase, RefreshCw, ArrowRight } from 'lucide-react';
+import { InstallPromptDialog } from './InstallPromptDialog';
 
 interface WelcomeScreenProps {
   onGetStarted: () => void;
   onSignUp?: () => void;
 }
 
+// Check if app is already installed (standalone mode)
+const isStandalone = (): boolean => {
+  return window.matchMedia('(display-mode: standalone)').matches ||
+    (window.navigator as any).standalone === true;
+};
+
+// Detect if device is mobile
+const isMobile = (): boolean => {
+  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+};
+
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onGetStarted, onSignUp }) => {
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+
+  useEffect(() => {
+    // Only show on mobile devices
+    if (!isMobile()) {
+      return;
+    }
+
+    // Don't show if already installed
+    if (isStandalone()) {
+      return;
+    }
+
+    // Check if user has already dismissed the prompt
+    const hasSeenPrompt = localStorage.getItem('nyem-install-prompt-dismissed');
+    if (hasSeenPrompt) {
+      return;
+    }
+
+    // Show prompt after a short delay (2 seconds) to not interrupt the welcome experience
+    const timer = setTimeout(() => {
+      setShowInstallPrompt(true);
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleCloseInstallPrompt = () => {
+    setShowInstallPrompt(false);
+    // Remember that user dismissed the prompt (don't show again)
+    localStorage.setItem('nyem-install-prompt-dismissed', 'true');
+  };
+
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-brand via-brand to-brand-dark relative overflow-hidden">
+    <div 
+      className="flex flex-col h-full w-full min-h-screen relative overflow-hidden"
+      style={{
+        backgroundColor: '#880e4f',
+        backgroundImage: 'linear-gradient(135deg, #880e4f 0%, #751043 50%, #5c0d35 100%)',
+        backgroundSize: '100% 100%',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }}
+    >
       
       {/* Decorative Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -151,6 +205,12 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onGetStarted, onSi
           }
         }
       `}</style>
+
+      {/* Install Prompt Dialog */}
+      <InstallPromptDialog
+        isOpen={showInstallPrompt}
+        onClose={handleCloseInstallPrompt}
+      />
     </div>
   );
 };

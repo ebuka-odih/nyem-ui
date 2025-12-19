@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { AppHeader } from './AppHeader';
 import { apiFetch } from '../utils/api';
 import { ENDPOINTS } from '../constants/endpoints';
+import { PLACEHOLDER_AVATAR, generateInitialsAvatar } from '../constants/placeholders';
 
 interface EditProfileScreenProps {
   onBack: () => void;
@@ -46,12 +47,18 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ onBack }) 
     const fetchCities = async () => {
       try {
         setLoadingCities(true);
+        setError(null);
         const res = await apiFetch(ENDPOINTS.locationsCities);
+        // Handle both response formats: { data: { cities: [...] } } or { cities: [...] }
         const citiesData = res.data?.cities || res.cities || [];
+        if (citiesData.length === 0) {
+          console.warn('No cities returned from API');
+        }
         setCities(citiesData);
       } catch (err) {
         console.error('Failed to fetch cities:', err);
         setError('Failed to load cities. Please try again.');
+        setCities([]);
       } finally {
         setLoadingCities(false);
       }
@@ -136,7 +143,7 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ onBack }) 
     try {
       const updateData: any = {
         username: username.trim(),
-        city_id: cityId,
+        city_id: typeof cityId === 'number' ? cityId : parseInt(cityId as string),
         bio: bio || undefined,
       };
 
@@ -145,10 +152,16 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ onBack }) 
         updateData.name = displayname.trim();
       }
 
-      // Add area_id if selected
-      if (areaId) {
-        updateData.area_id = areaId;
+      // Always include area_id - send null if not selected, or the ID if selected
+      // This ensures the backend can properly clear or set the area
+      // Convert to number if it's a valid number, otherwise send null
+      if (areaId && areaId !== '' && !isNaN(Number(areaId))) {
+        updateData.area_id = typeof areaId === 'number' ? areaId : parseInt(areaId as string);
+      } else {
+        updateData.area_id = null;
       }
+
+      console.log('[EditProfileScreen] Sending update data:', updateData);
 
       await updateProfile(updateData);
       await refreshUser();
@@ -184,7 +197,30 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ onBack }) 
         <div className="flex justify-center">
             <div className="relative">
                 <img 
-                    src={user?.profile_photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.username || 'User')}&background=random`}
+                    src={(() => {
+                      const profilePhoto = user?.profile_photo;
+                      const userName = (user as any)?.name || user?.username || 'User';
+                      if (!profilePhoto || profilePhoto.trim() === '') {
+                        return generateInitialsAvatar(userName);
+                      }
+                      // Filter out generated avatars
+                      const generatedAvatarPatterns = [
+                        'ui-avatars.com',
+                        'pravatar.cc',
+                        'i.pravatar.cc',
+                        'robohash.org',
+                        'dicebear.com',
+                        'avatar.vercel.sh',
+                      ];
+                      const isGeneratedAvatar = generatedAvatarPatterns.some(pattern => 
+                        profilePhoto.toLowerCase().includes(pattern.toLowerCase())
+                      );
+                      return isGeneratedAvatar ? generateInitialsAvatar(userName) : profilePhoto;
+                    })()}
+                    onError={(e) => {
+                      const userName = (user as any)?.name || user?.username || 'User';
+                      (e.target as HTMLImageElement).src = generateInitialsAvatar(userName);
+                    }}
                     alt="Profile Avatar" 
                     className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg" 
                 />

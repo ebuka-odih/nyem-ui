@@ -7,10 +7,11 @@ import { LoginPrompt } from './common/LoginPrompt';
 import { SearchBar } from './matches/SearchBar';
 import { MatchRequestsCard } from './matches/MatchRequestsCard';
 import { MatchList } from './matches/MatchList';
+import { PLACEHOLDER_AVATAR, generateInitialsAvatar } from '../constants/placeholders';
 
 interface MatchesScreenProps {
   onNavigateToRequests: () => void;
-  onNavigateToChat: () => void;
+  onNavigateToChat: (conversation: any) => void;
   onLoginRequest?: (method: 'google' | 'email') => void;
   onSignUpRequest?: () => void;
 }
@@ -31,7 +32,7 @@ export const MatchesScreen: React.FC<MatchesScreenProps> = ({ onNavigateToReques
   const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
-    const fetchMatches = async () => {
+    const fetchConversations = async () => {
       if (!token) {
         setLoading(false);
         return;
@@ -39,22 +40,43 @@ export const MatchesScreen: React.FC<MatchesScreenProps> = ({ onNavigateToReques
 
       setLoading(true);
       try {
-        // Fetch matches
-        const matchesRes = await apiFetch(ENDPOINTS.matches.list, { token });
-        const matchesData = matchesRes.data || matchesRes.matches || [];
+        // Fetch conversations (chat threads) instead of matches
+        const conversationsRes = await apiFetch(ENDPOINTS.conversations.list, { token });
+        const conversationsData = conversationsRes.data || conversationsRes.conversations || [];
 
-        // Transform API matches to Match format
-        const transformedMatches: Match[] = matchesData.map((match: any) => {
-          const otherUser = match.user1 || match.user2 || match.other_user || {};
-          const lastMessage = match.last_message || {};
+        // Transform API conversations to Match format for display
+        // Store full conversation data for navigation
+        const transformedMatches: (Match & { conversationData?: any })[] = conversationsData.map((conversation: any) => {
+          const otherUser = conversation.other_user || {};
+          const lastMessage = conversation.last_message || {};
           
           return {
-            id: match.id,
+            id: conversation.id || conversation.conversation_id,
             name: otherUser.username || 'Unknown',
-            message: lastMessage.content || 'Start a conversation',
-            avatar: otherUser.profile_photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(otherUser.username || 'User')}`,
-            time: match.updated_at ? formatTime(match.updated_at) : 'Just now',
-            unread: match.unread_count > 0,
+            message: lastMessage.message_text || lastMessage.content || 'Start a conversation',
+            avatar: (() => {
+              const profilePhoto = otherUser.profile_photo;
+              const userName = otherUser.username || 'Unknown';
+              if (!profilePhoto || profilePhoto.trim() === '') {
+                return generateInitialsAvatar(userName);
+              }
+              // Filter out generated avatars
+              const generatedAvatarPatterns = [
+                'ui-avatars.com',
+                'pravatar.cc',
+                'i.pravatar.cc',
+                'robohash.org',
+                'dicebear.com',
+                'avatar.vercel.sh',
+              ];
+              const isGeneratedAvatar = generatedAvatarPatterns.some(pattern => 
+                profilePhoto.toLowerCase().includes(pattern.toLowerCase())
+              );
+              return isGeneratedAvatar ? generateInitialsAvatar(userName) : profilePhoto;
+            })(),
+            time: conversation.updated_at ? formatTime(conversation.updated_at) : 'Just now',
+            unread: conversation.unread_count > 0,
+            conversationData: conversation, // Store full conversation data
           };
         });
 
@@ -62,20 +84,20 @@ export const MatchesScreen: React.FC<MatchesScreenProps> = ({ onNavigateToReques
 
         // Fetch pending requests count
         try {
-          const pendingRes = await apiFetch(ENDPOINTS.swipes.pendingRequests, { token });
-          const pendingData = pendingRes.data || pendingRes.requests || [];
+          const pendingRes = await apiFetch(ENDPOINTS.tradeOffers.pending, { token });
+          const pendingData = pendingRes.data || pendingRes.trade_offers || [];
           setPendingCount(pendingData.length);
         } catch (error) {
           console.error('Failed to fetch pending requests:', error);
         }
       } catch (error) {
-        console.error('Failed to fetch matches:', error);
+        console.error('Failed to fetch conversations:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchMatches();
+    fetchConversations();
   }, [token]);
 
   const formatTime = (dateString: string): string => {
@@ -132,7 +154,12 @@ export const MatchesScreen: React.FC<MatchesScreenProps> = ({ onNavigateToReques
         <MatchList 
           matches={matches}
           loading={loading}
-          onMatchClick={() => onNavigateToChat()}
+          onMatchClick={(match) => {
+            const conversation = (match as any).conversationData;
+            if (conversation) {
+              onNavigateToChat(conversation);
+            }
+          }}
         />
       </div>
     </div>

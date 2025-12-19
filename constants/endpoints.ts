@@ -59,6 +59,17 @@ export const ENDPOINTS = {
     nearby: '/location/nearby',
     status: '/location/status',
   },
+  images: {
+    upload: '/images/upload',
+    uploadMultiple: '/images/upload-multiple',
+    uploadBase64: '/images/upload-base64',
+    uploadMultipleBase64: '/images/upload-multiple-base64',
+  },
+  serviceProviders: {
+    feed: '/service-providers/feed',
+    create: '/service-providers',
+    me: '/service-providers/me',
+  },
 };
 
 

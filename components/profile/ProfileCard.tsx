@@ -1,5 +1,6 @@
 import React from 'react';
 import { MapPin, Pencil } from 'lucide-react';
+import { PLACEHOLDER_AVATAR, generateInitialsAvatar } from '../../constants/placeholders';
 
 interface User {
   username?: string;
@@ -25,7 +26,32 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ user, onEditProfile })
         <div className="w-32 h-32 rounded-full bg-gradient-to-br from-brand/20 to-brand/5 p-1 mb-5 relative shadow-lg">
           <div className="w-full h-full rounded-full bg-white p-0.5">
             <img 
-              src={user?.profile_photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.username || 'User')}&background=random`}
+              src={(() => {
+                const profilePhoto = user?.profile_photo;
+                const userName = (user as any)?.name || user?.username || 'User';
+                
+                // Check if profile_photo exists and is not empty
+                if (!profilePhoto || profilePhoto.trim() === '') {
+                  return generateInitialsAvatar(userName);
+                }
+                // Filter out known generated avatar service URLs
+                const generatedAvatarPatterns = [
+                  'ui-avatars.com',
+                  'pravatar.cc',
+                  'i.pravatar.cc',
+                  'robohash.org',
+                  'dicebear.com',
+                  'avatar.vercel.sh',
+                ];
+                const isGeneratedAvatar = generatedAvatarPatterns.some(pattern => 
+                  profilePhoto.toLowerCase().includes(pattern.toLowerCase())
+                );
+                return isGeneratedAvatar ? generateInitialsAvatar(userName) : profilePhoto;
+              })()}
+              onError={(e) => {
+                const userName = (user as any)?.name || user?.username || 'User';
+                (e.target as HTMLImageElement).src = generateInitialsAvatar(userName);
+              }}
               alt="Profile" 
               className="w-full h-full rounded-full object-cover"
             />
@@ -46,12 +72,12 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ user, onEditProfile })
         )}
         
         {/* Location */}
-        {((user as any)?.cityLocation?.name || user?.city) && (
+        {(user?.cityLocation?.name || user?.city || user?.city_id) && (
           <div className="flex items-center justify-center text-gray-600 text-sm font-medium mb-4 px-4 py-1.5 bg-white/60 backdrop-blur-sm rounded-full border border-gray-100 shadow-sm">
             <MapPin size={14} className="mr-1.5 text-brand" />
             <span>
-              {(user as any)?.cityLocation?.name || user?.city}
-              {(user as any)?.areaLocation?.name && `, ${(user as any).areaLocation.name}`}
+              {user?.cityLocation?.name || user?.city || 'Location not set'}
+              {user?.areaLocation?.name && `, ${user.areaLocation.name}`}
             </span>
           </div>
         )}

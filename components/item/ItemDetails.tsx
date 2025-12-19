@@ -22,7 +22,7 @@ export const ItemDetails: React.FC<ItemDetailsProps> = ({ item, onImageClick }) 
           {allImages.map((img, i) => (
             <div 
               key={i} 
-              className="w-20 h-20 rounded-xl overflow-hidden shrink-0 border border-gray-100 cursor-pointer hover:border-[#990033] transition-colors"
+              className="w-20 h-20 rounded-xl overflow-hidden shrink-0 border border-gray-100 cursor-pointer hover:border-brand transition-colors"
               onClick={() => onImageClick?.(i)}
             >
               <img src={img} alt={`Gallery ${i + 1}`} className="w-full h-full object-cover" />
@@ -32,12 +32,14 @@ export const ItemDetails: React.FC<ItemDetailsProps> = ({ item, onImageClick }) 
       )}
 
       {/* Description */}
-      <div className="mb-8">
-        <h3 className="text-lg font-bold text-gray-900 mb-2">Description</h3>
-        <p className="text-gray-600 leading-relaxed text-sm">
-          {item.description}
-        </p>
-      </div>
+      {item.description && (
+        <div className="mb-8">
+          <h3 className="text-lg font-bold text-gray-900 mb-2">Description</h3>
+          <p className="text-gray-600 leading-relaxed text-sm">
+            {item.description}
+          </p>
+        </div>
+      )}
 
       {/* Looking For (if barter) */}
       {!isMarketplace && (

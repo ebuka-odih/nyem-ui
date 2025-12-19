@@ -9,6 +9,7 @@ import { ProfileCard } from './profile/ProfileCard';
 import { ProfileTabs } from './profile/ProfileTabs';
 import { ItemsGrid } from './profile/ItemsGrid';
 import { SettingsList } from './profile/SettingsList';
+import { AboutTab } from './profile/AboutTab';
 import { SwipeItem } from '../types';
 
 interface ProfileScreenProps {
@@ -43,38 +44,80 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onAddItem
 }) => {
   const { user, logout, token, refreshUser, isAuthenticated } = useAuth();
-  const [activeTab, setActiveTab] = useState<'items' | 'settings'>('items');
+  const [activeTab, setActiveTab] = useState<'about' | 'listings' | 'settings'>('about');
   const [userItems, setUserItems] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Determine if listings tab should be shown (always show it)
+  const hasItems = userItems.length > 0;
 
-  // Fetch user items from profile endpoint
+  // Helper function to format items
+  const formatItems = (items: any[]): UserItem[] => {
+    return items.map((item: any) => {
+      // Handle both 'photos' (from Item model) and 'images' (from ItemController feed)
+      const photos = item.photos || item.images || [];
+      const primaryImage = photos[0] || item.image || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="300"%3E%3Crect fill="%23f3f4f6" width="300" height="300"/%3E%3Ctext fill="%239ca3af" font-family="sans-serif" font-size="16" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E';
+      
+      // Format price with naira symbol
+      let formattedPrice: string | undefined = undefined;
+      if (item.price) {
+        if (typeof item.price === 'string') {
+          // If already a string, check if it has currency symbol
+          if (item.price.includes('₦') || item.price.includes('$')) {
+            // Replace $ with ₦ if present
+            formattedPrice = item.price.replace('$', '₦');
+          } else {
+            // Add ₦ if not present
+            formattedPrice = `₦${item.price}`;
+          }
+        } else {
+          // If number, format with commas and add ₦
+          formattedPrice = `₦${parseFloat(item.price).toLocaleString()}`;
+        }
+      }
+      
+      return {
+        id: item.id,
+        title: item.title || 'Untitled Item',
+        description: item.description,
+        condition: item.condition,
+        category_id: item.category_id,
+        type: item.type,
+        price: formattedPrice,
+        looking_for: item.looking_for,
+        image: primaryImage,
+        images: photos,
+        gallery: photos,
+      };
+    });
+  };
+
+  // Fetch user items from feed endpoint (same approach as UserProfileScreen)
   useEffect(() => {
     const fetchUserItems = async () => {
-      if (!token || !isAuthenticated) {
+      if (!token || !isAuthenticated || !user?.id) {
         setLoading(false);
         return;
       }
 
       try {
-        // Fetch user profile which includes items
-        const res = await apiFetch(ENDPOINTS.profile.me, { token });
-        const userData = res.user || {};
-        const items = (userData.items || []).filter((item: any) => item.status === 'active');
+        // Fetch items from feed and filter by current user's ID
+        // This is the same approach used in UserProfileScreen
+        const res = await apiFetch(ENDPOINTS.items.feed, { 
+          token: token || undefined 
+        });
+        
+        const allItems = res.items || res.data || [];
+        
+        // Filter items by current user ID and only show active items
+        const activeItems = allItems
+          .filter((item: any) => {
+            const itemUserId = item.user?.id || item.user_id;
+            return String(itemUserId) === String(user.id) && item.status === 'active';
+          });
         
         // Format items for display
-        const formattedItems: UserItem[] = items.map((item: any) => ({
-          id: item.id,
-          title: item.title || 'Untitled Item',
-          description: item.description,
-          condition: item.condition,
-          category_id: item.category_id,
-          type: item.type,
-          price: item.price ? `$${parseFloat(item.price).toFixed(2)}` : undefined,
-          looking_for: item.looking_for,
-          image: item.images?.[0] || item.image || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="300"%3E%3Crect fill="%23f3f4f6" width="300" height="300"/%3E%3Ctext fill="%239ca3af" font-family="sans-serif" font-size="16" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E',
-          images: item.images || [],
-          gallery: item.images || [],
-        }));
+        const formattedItems = formatItems(activeItems);
         setUserItems(formattedItems);
       } catch (error) {
         console.error('Failed to fetch user items:', error);
@@ -85,28 +128,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     };
 
     fetchUserItems();
-  }, [token, isAuthenticated]); // Re-fetch when auth state changes
-
-  // Also refresh items when user data changes (e.g., after editing items)
-  useEffect(() => {
-    if (user && token && isAuthenticated) {
-      const items = ((user as any).items || []).filter((item: any) => item.status === 'active');
-      const formattedItems: UserItem[] = items.map((item: any) => ({
-        id: item.id,
-        title: item.title || 'Untitled Item',
-        description: item.description,
-        condition: item.condition,
-        category_id: item.category_id,
-        type: item.type,
-        price: item.price ? `$${parseFloat(item.price).toFixed(2)}` : undefined,
-        looking_for: item.looking_for,
-        image: item.images?.[0] || item.image || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="300"%3E%3Crect fill="%23f3f4f6" width="300" height="300"/%3E%3Ctext fill="%239ca3af" font-family="sans-serif" font-size="16" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E',
-        images: item.images || [],
-        gallery: item.images || [],
-      }));
-      setUserItems(formattedItems);
-    }
-  }, [user, token, isAuthenticated]);
+  }, [token, isAuthenticated, user?.id]); // Re-fetch when auth state or user ID changes
 
   const handleLogout = async () => {
     if (window.confirm('Are you sure you want to logout?')) {
@@ -146,11 +168,18 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         <ProfileCard user={user} onEditProfile={onEditProfile} />
 
         {/* Tabs Navigation */}
-        <ProfileTabs activeTab={activeTab} onTabChange={setActiveTab} />
+        <ProfileTabs 
+          activeTab={activeTab} 
+          onTabChange={setActiveTab}
+          showListings={true}
+        />
 
         {/* Tab Content */}
         <div className="px-6 pb-6">
-          {activeTab === 'items' ? (
+          {activeTab === 'about' && (
+            <AboutTab user={user} />
+          )}
+          {activeTab === 'listings' && (
             <ItemsGrid 
               items={userItems} 
               loading={loading}
@@ -158,7 +187,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               onItemEdit={onItemEdit}
               onAddItem={onAddItem}
             />
-          ) : (
+          )}
+          {activeTab === 'settings' && (
             <SettingsList onLogout={handleLogout} />
           )}
         </div>
