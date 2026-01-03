@@ -98,7 +98,7 @@ export const LocationPermissionModal: React.FC<LocationPermissionModalProps> = (
             Enable Location Access
           </h2>
           <p className="text-sm text-neutral-600 leading-relaxed mb-6">
-            We'll show you listings closer to you first, just like Tinder! This helps you discover items nearby in your city.
+            We'll show you listings closer to you first! This helps you discover items nearby in your city.
           </p>
 
           {error && (
@@ -111,7 +111,7 @@ export const LocationPermissionModal: React.FC<LocationPermissionModalProps> = (
             <button
               onClick={handleAllow}
               disabled={loading}
-              className="w-full bg-neutral-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full bg-[#830e4c] text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>

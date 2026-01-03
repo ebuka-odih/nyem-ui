@@ -26,7 +26,6 @@ export const DiscoverHeader: React.FC<DiscoverHeaderProps> = ({
           <span className="text-sm sm:text-base font-black tracking-tight uppercase italic text-[#830e4c] leading-none">
             Nyem <span className="text-[#830e4c]/70 ml-1">Marketplace</span>
           </span>
-          <span className="text-[8px] font-black uppercase tracking-[0.2em] text-neutral-300 mt-1 hidden sm:block">Local Discovery Engine</span>
         </div>
       </div>
 

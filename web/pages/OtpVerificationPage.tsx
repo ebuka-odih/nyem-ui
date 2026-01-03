@@ -202,7 +202,7 @@ export const OtpVerificationPage: React.FC<OtpVerificationPageProps> = ({ email,
         <button 
           onClick={() => handleVerify()}
           disabled={loading || otp.some(d => d === "")}
-          className="w-full bg-neutral-900 text-white py-6 rounded-full font-black uppercase tracking-[0.3em] text-[11px] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full bg-[#830e4c] text-white py-6 rounded-full font-black uppercase tracking-[0.3em] text-[11px] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? 'Verifying...' : 'Verify & Finish'}
           {!loading && <ArrowRight size={18} strokeWidth={3} />}
